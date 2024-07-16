@@ -1,0 +1,70 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+from statsmodels.tsa.stattools import adfuller
+from statsmodels.tsa.arima.model import ARIMA
+
+# Load the CSV file
+df = pd.read_csv("C:/Users/Sahil/Downloads/RevenueModel.csv", index_col='Date', parse_dates=True)
+
+# Drop rows with any missing values
+df = df.dropna()
+
+# Ensure the 'Date' column is in datetime format
+df.index = pd.to_datetime(df.index)
+
+# Resample the data to monthly frequency, taking the mean of each month
+df_monthly = df.resample('ME').mean()
+
+# Handle missing values after resampling
+df_monthly = df_monthly.dropna()
+
+# Plot the monthly 'SubscriptionRevenue' column
+df_monthly['SubscriptionRevenue'].plot(figsize=(12, 5))
+plt.title('Monthly Subscription Revenue Over Time')
+plt.xlabel('Date')
+plt.ylabel('Subscription Revenue')
+plt.show()
+
+# Define the ADF test function
+def ad_test(dataset):
+    dftest = adfuller(dataset, autolag='AIC')
+    print("1. ADF : ", dftest[0])
+    print("2. P-value : ", dftest[1])
+    print("3. Num of Lags : ", dftest[2])
+    print("4. Num of Observations Used For ADF Regression and Critical Values Calculation :", dftest[3])
+    print("5. Critical Values :")
+    for key, val in dftest[4].items():
+        print(f"\t{key}: {val}")
+
+# Perform the ADF test on the resampled 'SubscriptionRevenue' column
+ad_test(df_monthly['SubscriptionRevenue'])
+
+# Splitting the data into train and test sets (using last 12 months for testing)
+train = df_monthly.iloc[:-12]
+test = df_monthly.iloc[-12:]
+
+# Fit the ARIMA model with manually selected order
+model = ARIMA(train['SubscriptionRevenue'], order=(1,1,1))
+model_fit = model.fit()
+
+# Display the model summary
+print(model_fit.summary())
+
+# Make predictions
+start = len(train)
+end = len(train) + len(test) - 1
+predictions = model_fit.predict(start=start, end=end, typ='levels')
+
+# Plot the results
+plt.figure(figsize=(12, 5))
+plt.plot(train.index, train['SubscriptionRevenue'], label='Train')
+plt.plot(test.index, test['SubscriptionRevenue'], label='Test')
+plt.plot(predictions.index, predictions, label='Predicted', color='red')
+plt.title('ARIMA Model - Monthly Subscription Revenue Prediction')
+plt.xlabel('Date')
+plt.ylabel('Subscription Revenue')
+plt.legend()
+plt.show()
+
+# Display the predictions
+print(predictions)
